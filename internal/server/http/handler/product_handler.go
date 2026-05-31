@@ -15,6 +15,7 @@ type ProductHandler interface {
 	CreateProduct(c *fiber.Ctx) error
 	GetProduct(c *fiber.Ctx) error
 	ListProducts(c *fiber.Ctx) error
+	ListProductsWithVersions(c *fiber.Ctx) error
 	UpdateProduct(c *fiber.Ctx) error
 	DeleteProduct(c *fiber.Ctx) error
 }
@@ -73,16 +74,27 @@ func (h *productHandler) ListProducts(c *fiber.Ctx) error {
 		"method": "ListProducts",
 	})
 
-	userID, ok := c.Locals(middleware.LocalUserID).(string)
-	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "unauthorized",
+	products, err := h.service.ListAllProducts(c.Context())
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list products")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to list products",
 		})
 	}
 
-	products, err := h.service.ListProducts(c.Context(), userID)
+	return c.JSON(products)
+}
+
+// GET /api/v1/products-with-versions
+func (h *productHandler) ListProductsWithVersions(c *fiber.Ctx) error {
+	log := h.log.WithFields(map[string]any{
+		"layer":  "product_handler",
+		"method": "ListProductsWithVersions",
+	})
+
+	products, err := h.service.ListAllProductsWithVersions(c.Context())
 	if err != nil {
-		log.Error().Err(err).Msg("failed to list products")
+		log.Error().Err(err).Msg("failed to list products with versions")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to list products",
 		})

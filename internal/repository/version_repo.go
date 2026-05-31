@@ -12,6 +12,7 @@ import (
 type VersionRepository interface {
 	Create(ctx context.Context, version *domain.Version) error
 	GetByID(ctx context.Context, versionID string) (*domain.Version, error)
+	ListAll(ctx context.Context) ([]domain.VersionResponse, error)
 	ListByProductID(ctx context.Context, productID string) ([]domain.VersionResponse, error)
 	Update(ctx context.Context, versionID, label, name string) error
 	UpdateURL(ctx context.Context, versionID, url string) error
@@ -106,6 +107,28 @@ func (r *versionRepository) ListByProductID(ctx context.Context, productID strin
 	}
 
 	log.Debug().Int("count", len(versions)).Msg("versions fetched successfully")
+	return versions, nil
+}
+
+func (r *versionRepository) ListAll(ctx context.Context) ([]domain.VersionResponse, error) {
+	log := r.log.WithFields(map[string]any{
+		"layer":      "version_repo",
+		"method":     "ListAll",
+		"request_id": ctx.Value("request_id"),
+	})
+
+	log.Debug().Msg("Fetching all versions")
+
+	query := `SELECT id, label, name, product_id, url, created_at FROM versions ORDER BY created_at DESC`
+
+	var versions []domain.VersionResponse
+	err := r.db.SelectContext(ctx, &versions, query)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to fetch all versions")
+		return nil, err
+	}
+
+	log.Debug().Int("count", len(versions)).Msg("all versions fetched successfully")
 	return versions, nil
 }
 

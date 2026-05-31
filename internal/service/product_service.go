@@ -14,17 +14,20 @@ type ProductService interface {
 	CreateProduct(ctx context.Context, userID, name string) (*domain.ProductResponse, error)
 	GetProduct(ctx context.Context, productID, userID string) (*domain.ProductResponse, error)
 	ListProducts(ctx context.Context, userID string) ([]domain.ProductResponse, error)
+	ListAllProducts(ctx context.Context) ([]domain.ProductResponse, error)
+	ListAllProductsWithVersions(ctx context.Context) ([]domain.ProductWithVersionsResponse, error)
 	UpdateProduct(ctx context.Context, productID, userID, name string) error
 	DeleteProduct(ctx context.Context, productID, userID string) error
 }
 
 type productService struct {
-	repo repository.ProductRepository
-	log  logger.Logger
+	repo        repository.ProductRepository
+	versionRepo repository.VersionRepository
+	log         logger.Logger
 }
 
-func NewProductService(repo repository.ProductRepository) ProductService {
-	return &productService{repo: repo, log: logger.Get()}
+func NewProductService(repo repository.ProductRepository, versionRepo repository.VersionRepository) ProductService {
+	return &productService{repo: repo, versionRepo: versionRepo, log: logger.Get()}
 }
 
 func (s *productService) CreateProduct(ctx context.Context, userID, name string) (*domain.ProductResponse, error) {
@@ -70,10 +73,6 @@ func (s *productService) GetProduct(ctx context.Context, productID, userID strin
 		return nil, err
 	}
 
-	if product.UserID != userID {
-		return nil, domain.ErrProductNotFound
-	}
-
 	return &domain.ProductResponse{
 		ID:        product.ID,
 		Name:      product.Name,
@@ -98,6 +97,69 @@ func (s *productService) ListProducts(ctx context.Context, userID string) ([]dom
 	}
 
 	return products, nil
+}
+
+func (s *productService) ListAllProducts(ctx context.Context) ([]domain.ProductResponse, error) {
+	log := s.log.WithFields(map[string]any{
+		"layer":      "product_service",
+		"method":     "ListAllProducts",
+		"request_id": ctx.Value("request_id"),
+	})
+
+	log.Debug().Msg("listing all products")
+
+	products, err := s.repo.ListAll(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list all products")
+		return nil, err
+	}
+
+	return products, nil
+}
+
+func (s *productService) ListAllProductsWithVersions(ctx context.Context) ([]domain.ProductWithVersionsResponse, error) {
+	log := s.log.WithFields(map[string]any{
+		"layer":      "product_service",
+		"method":     "ListAllProductsWithVersions",
+		"request_id": ctx.Value("request_id"),
+	})
+
+	log.Debug().Msg("listing all products with versions")
+
+	products, err := s.repo.ListAll(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list all products")
+		return nil, err
+	}
+
+	versions, err := s.versionRepo.ListAll(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list all versions")
+		return nil, err
+	}
+
+	versionMap := make(map[string][]domain.VersionResponse, len(products))
+	for _, v := range versions {
+		versionMap[v.ProductID] = append(versionMap[v.ProductID], v)
+	}
+
+	result := make([]domain.ProductWithVersionsResponse, 0, len(products))
+	for _, p := range products {
+		pVersions := versionMap[p.ID]
+		if pVersions == nil {
+			pVersions = []domain.VersionResponse{}
+		}
+		result = append(result, domain.ProductWithVersionsResponse{
+			ID:        p.ID,
+			Name:      p.Name,
+			UserID:    p.UserID,
+			CreatedAt: p.CreatedAt,
+			Versions:  pVersions,
+		})
+	}
+
+	log.Debug().Int("count", len(result)).Msg("all products with versions fetched successfully")
+	return result, nil
 }
 
 func (s *productService) UpdateProduct(ctx context.Context, productID, userID, name string) error {

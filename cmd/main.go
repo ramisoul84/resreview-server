@@ -92,7 +92,7 @@ func main() {
 	authSvc := service.NewAuthService(userRepo, tokenSvc)
 	userSvc := service.NewUserService(userRepo)
 	sessionSvc := service.NewSessionService(sessionRepo)
-	productSvc := service.NewProductService(productRepo)
+	productSvc := service.NewProductService(productRepo, versionRepo)
 	versionSvc := service.NewVersionService(versionRepo, productRepo, photoRepo, photoStorage, cfg.MinIO.MaxSizeBytes())
 	annotationSvc := service.NewAnnotationService(annotationRepo, versionRepo, productRepo, wsHub)
 
@@ -131,6 +131,9 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
+	wsHub.Shutdown()
+	time.Sleep(100 * time.Millisecond)
 
 	if err := wsServer.Shutdown(ctx); err != nil {
 		log.Error().Err(err).Msg("WebSocket server forced shutdown")

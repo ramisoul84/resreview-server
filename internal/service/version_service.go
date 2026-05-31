@@ -14,8 +14,8 @@ import (
 
 type VersionService interface {
 	CreateVersion(ctx context.Context, productID, userID, label, name string) (*domain.VersionResponse, error)
-	GetVersion(ctx context.Context, versionID, productID, userID string) (*domain.VersionResponse, error)
-	ListVersions(ctx context.Context, productID, userID string) ([]domain.VersionResponse, error)
+	GetVersion(ctx context.Context, versionID, productID string) (*domain.VersionResponse, error)
+	ListVersions(ctx context.Context, productID string) ([]domain.VersionResponse, error)
 	UpdateVersion(ctx context.Context, versionID, productID, userID, label, name string) error
 	DeleteVersion(ctx context.Context, versionID, productID, userID string) error
 	UploadVersionImage(ctx context.Context, versionID, productID, userID string, data []byte, mimeType string) (*domain.VersionResponse, error)
@@ -93,7 +93,7 @@ func (s *versionService) CreateVersion(ctx context.Context, productID, userID, l
 	}, nil
 }
 
-func (s *versionService) GetVersion(ctx context.Context, versionID, productID, userID string) (*domain.VersionResponse, error) {
+func (s *versionService) GetVersion(ctx context.Context, versionID, productID string) (*domain.VersionResponse, error) {
 	log := s.log.WithFields(map[string]any{
 		"layer":      "version_service",
 		"method":     "GetVersion",
@@ -101,10 +101,6 @@ func (s *versionService) GetVersion(ctx context.Context, versionID, productID, u
 	})
 
 	log.Debug().Str("version_id", versionID).Msg("getting version")
-
-	if err := s.verifyProductOwnership(ctx, productID, userID); err != nil {
-		return nil, err
-	}
 
 	version, err := s.versionRepo.GetByID(ctx, versionID)
 	if err != nil {
@@ -125,7 +121,7 @@ func (s *versionService) GetVersion(ctx context.Context, versionID, productID, u
 	}, nil
 }
 
-func (s *versionService) ListVersions(ctx context.Context, productID, userID string) ([]domain.VersionResponse, error) {
+func (s *versionService) ListVersions(ctx context.Context, productID string) ([]domain.VersionResponse, error) {
 	log := s.log.WithFields(map[string]any{
 		"layer":      "version_service",
 		"method":     "ListVersions",
@@ -133,10 +129,6 @@ func (s *versionService) ListVersions(ctx context.Context, productID, userID str
 	})
 
 	log.Debug().Str("product_id", productID).Msg("listing versions")
-
-	if err := s.verifyProductOwnership(ctx, productID, userID); err != nil {
-		return nil, err
-	}
 
 	versions, err := s.versionRepo.ListByProductID(ctx, productID)
 	if err != nil {

@@ -12,6 +12,7 @@ import (
 type ProductRepository interface {
 	Create(ctx context.Context, product *domain.Product) error
 	GetByID(ctx context.Context, productID string) (*domain.Product, error)
+	ListAll(ctx context.Context) ([]domain.ProductResponse, error)
 	ListByUserID(ctx context.Context, userID string) ([]domain.ProductResponse, error)
 	Update(ctx context.Context, productID, userID, name string) error
 	Delete(ctx context.Context, productID, userID string) error
@@ -82,6 +83,28 @@ func (r *productRepository) GetByID(ctx context.Context, productID string) (*dom
 
 	log.Debug().Msg("product fetched successfully")
 	return &product, nil
+}
+
+func (r *productRepository) ListAll(ctx context.Context) ([]domain.ProductResponse, error) {
+	log := r.log.WithFields(map[string]any{
+		"layer":      "product_repo",
+		"method":     "ListAll",
+		"request_id": ctx.Value("request_id"),
+	})
+
+	log.Debug().Msg("Fetching all products")
+
+	query := `SELECT id, name, user_id, created_at FROM products ORDER BY created_at DESC`
+
+	var products []domain.ProductResponse
+	err := r.db.SelectContext(ctx, &products, query)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to fetch all products")
+		return nil, err
+	}
+
+	log.Debug().Int("count", len(products)).Msg("all products fetched successfully")
+	return products, nil
 }
 
 func (r *productRepository) ListByUserID(ctx context.Context, userID string) ([]domain.ProductResponse, error) {

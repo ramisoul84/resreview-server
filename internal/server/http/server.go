@@ -76,6 +76,7 @@ func (s *Server) RegisterRoutes(
 
 	protected.Post("/products", products.CreateProduct)
 	protected.Get("/products", products.ListProducts)
+	protected.Get("/products-with-versions", products.ListProductsWithVersions)
 	protected.Get("/products/:productId", products.GetProduct)
 	protected.Put("/products/:productId", products.UpdateProduct)
 	protected.Delete("/products/:productId", products.DeleteProduct)

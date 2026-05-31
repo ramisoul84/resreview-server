@@ -118,8 +118,8 @@ func (h *authHandler) Login(c *fiber.Ctx) error {
 	resp, err := h.service.Login(ctx.ctx, &req, fingerprint)
 	if err != nil {
 		switch {
-		case errors.Is(err, domain.ErrInvalidCredentials):
-			log.Debug().Msg("invalid credentials")
+		case errors.Is(err, domain.ErrInvalidCredentials), errors.Is(err, domain.ErrUserNotFound):
+			log.Debug().Err(err).Msg("invalid credentials")
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "invalid credentials",
 			})

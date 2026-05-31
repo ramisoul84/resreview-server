@@ -23,3 +23,11 @@ type ProductResponse struct {
 	UserID    string    `json:"userId" db:"user_id"`
 	CreatedAt time.Time `json:"createdAt" db:"created_at"`
 }
+
+type ProductWithVersionsResponse struct {
+	ID        string            `json:"id"`
+	Name      string            `json:"name"`
+	UserID    string            `json:"userId"`
+	CreatedAt time.Time         `json:"createdAt"`
+	Versions  []VersionResponse `json:"versions"`
+}

@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -8,6 +9,13 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 )
+
+type inboundMsg struct {
+	Op struct {
+		Op        string `json:"op"`
+		VersionID string `json:"versionId"`
+	} `json:"op"`
+}
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -43,11 +51,12 @@ func HandleWebSocket(hub *Hub, jwtSecret string) http.HandlerFunc {
 		}
 
 		client := &Client{
-			Hub:    hub,
-			UserID: claims.Subject,
-			Name:   r.URL.Query().Get("name"),
-			Color:  r.URL.Query().Get("color"),
-			Send:   make(chan []byte, 256),
+			Hub:       hub,
+			UserID:    claims.Subject,
+			Name:      r.URL.Query().Get("name"),
+			Color:     r.URL.Query().Get("color"),
+			VersionID: r.URL.Query().Get("versionId"),
+			Send:      make(chan []byte, 256),
 		}
 
 		hub.register <- client
@@ -74,29 +83,46 @@ func parseJWT(tokenStr, secret string) (*accessClaims, error) {
 	return claims, nil
 }
 
+const (
+	pingInterval = 25 * time.Second
+	writeWait    = 10 * time.Second
+	pongWait     = 30 * time.Second
+	maxMsgSize   = 65536
+)
+
 func (c *Client) readPump(conn *websocket.Conn) {
 	defer func() {
 		c.Hub.unregister <- c
 		conn.Close()
 	}()
 
-	conn.SetReadLimit(4096)
-	conn.SetReadDeadline(time.Now().Add(20 * time.Second))
+	conn.SetReadLimit(maxMsgSize)
+	conn.SetReadDeadline(time.Now().Add(pongWait))
+
 	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(20 * time.Second))
+		conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+
+	conn.SetCloseHandler(func(code int, text string) error {
+		conn.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
 
 	for {
-		_, _, err := conn.ReadMessage()
+		_, msgBytes, err := conn.ReadMessage()
 		if err != nil {
 			break
+		}
+		var msg inboundMsg
+		if err := json.Unmarshal(msgBytes, &msg); err == nil && msg.Op.Op == "set_viewing_version" {
+			c.Hub.SetClientVersion(c, msg.Op.VersionID)
 		}
 	}
 }
 
 func (c *Client) writePump(conn *websocket.Conn) {
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(pingInterval)
 	defer func() {
 		ticker.Stop()
 		conn.Close()
@@ -109,12 +135,13 @@ func (c *Client) writePump(conn *websocket.Conn) {
 				conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
 				return
 			}
+
 		case <-ticker.C:
-			conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}

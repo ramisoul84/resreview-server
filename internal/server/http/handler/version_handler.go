@@ -90,13 +90,6 @@ func (h *versionHandler) ListVersions(c *fiber.Ctx) error {
 		"method": "ListVersions",
 	})
 
-	userID, ok := c.Locals(middleware.LocalUserID).(string)
-	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "unauthorized",
-		})
-	}
-
 	productID := c.Params("productId")
 	if productID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -104,19 +97,12 @@ func (h *versionHandler) ListVersions(c *fiber.Ctx) error {
 		})
 	}
 
-	versions, err := h.service.ListVersions(c.Context(), productID, userID)
+	versions, err := h.service.ListVersions(c.Context(), productID)
 	if err != nil {
-		switch {
-		case errors.Is(err, domain.ErrProductNotFound):
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "product not found",
-			})
-		default:
-			log.Error().Err(err).Msg("failed to list versions")
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "failed to list versions",
-			})
-		}
+		log.Error().Err(err).Msg("failed to list versions")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to list versions",
+		})
 	}
 
 	return c.JSON(versions)
@@ -128,13 +114,6 @@ func (h *versionHandler) GetVersion(c *fiber.Ctx) error {
 		"layer":  "version_handler",
 		"method": "GetVersion",
 	})
-
-	userID, ok := c.Locals(middleware.LocalUserID).(string)
-	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "unauthorized",
-		})
-	}
 
 	productID := c.Params("productId")
 	if productID == "" {
@@ -150,10 +129,10 @@ func (h *versionHandler) GetVersion(c *fiber.Ctx) error {
 		})
 	}
 
-	version, err := h.service.GetVersion(c.Context(), versionID, productID, userID)
+	version, err := h.service.GetVersion(c.Context(), versionID, productID)
 	if err != nil {
 		switch {
-		case errors.Is(err, domain.ErrProductNotFound), errors.Is(err, domain.ErrVersionNotFound):
+		case errors.Is(err, domain.ErrVersionNotFound):
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "version not found",
 			})
