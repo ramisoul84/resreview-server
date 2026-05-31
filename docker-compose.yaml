@@ -10,6 +10,7 @@ services:
       APP_ENV: production
     ports:
       - "8100:8100"
+      - "8101:8101"
     volumes:
       - /var/log/resreview-server:/var/log/resreview-server
     networks:
