@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-[ -f .env ] && export $(grep -v '^#' .env.dev | xargs)
+[ -f .env.prod ] && export $(grep -v '^#' .env.prod | xargs)
 
-echo "Running migrations UP...$DB_NAME ..."
+echo "Running migrations UP..."
 
 for f in migrations/*.up.sql; do
   echo "  → $f"
