@@ -143,17 +143,19 @@ func (s *annotationService) UpdateAnnotation(ctx context.Context, id string, req
 		Y:         req.Y,
 		Title:     req.Title,
 		Text:      req.Text,
+		Color:     req.Color,
 		UpdatedAt: time.Now(),
 	}
 
-	if err := s.repo.Update(ctx, ann); err != nil {
+	updated, err := s.repo.Update(ctx, ann)
+	if err != nil {
 		log.Error().Err(err).Msg("failed to update annotation")
 		return err
 	}
 
 	if s.ws != nil {
-		update := map[string]any{"id": id, "data": req.Data, "x": req.X, "y": req.Y, "title": req.Title, "text": req.Text}
-		payload, _ := json.Marshal(update)
+		resp := s.toResponse(*updated)
+		payload, _ := json.Marshal(resp)
 		msg := fmt.Appendf(nil, `{"type":"patch","op":{"op":"update_annotation","annotation":%s}}`, payload)
 		s.ws.Broadcast(msg)
 	}

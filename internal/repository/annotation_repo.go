@@ -12,7 +12,7 @@ import (
 type AnnotationRepository interface {
 	ListByVersionID(ctx context.Context, versionID string) ([]domain.Annotation, error)
 	Create(ctx context.Context, ann *domain.Annotation) error
-	Update(ctx context.Context, ann *domain.Annotation) error
+	Update(ctx context.Context, ann *domain.Annotation) (*domain.Annotation, error)
 	Delete(ctx context.Context, id string) error
 }
 
@@ -65,7 +65,7 @@ func (r *annotationRepository) Create(ctx context.Context, ann *domain.Annotatio
 	return nil
 }
 
-func (r *annotationRepository) Update(ctx context.Context, ann *domain.Annotation) error {
+func (r *annotationRepository) Update(ctx context.Context, ann *domain.Annotation) (*domain.Annotation, error) {
 	log := r.log.WithFields(map[string]any{
 		"layer":      "annotation_repo",
 		"method":     "Update",
@@ -77,10 +77,10 @@ func (r *annotationRepository) Update(ctx context.Context, ann *domain.Annotatio
 	err := r.db.GetContext(ctx, &existing, `SELECT id, version_id, type, data::text, user_id, session_id, color, stroke_w, stroke_style, x, y, title, text, created_at, updated_at FROM annotations WHERE id = $1`, ann.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return domain.ErrAnnotationNotFound
+			return nil, domain.ErrAnnotationNotFound
 		}
 		log.Error().Err(err).Msg("failed to fetch annotation for update")
-		return err
+		return nil, err
 	}
 
 	data := ann.Data
@@ -103,18 +103,31 @@ func (r *annotationRepository) Update(ctx context.Context, ann *domain.Annotatio
 	if text == "" {
 		text = existing.Text
 	}
+	color := ann.Color
+	if color == "" {
+		color = existing.Color
+	}
 
-	query := `UPDATE annotations SET data = $1::jsonb, x = $2, y = $3, title = $4, text = $5, updated_at = $6 WHERE id = $7`
-	res, err := r.db.ExecContext(ctx, query, data, x, y, title, text, ann.UpdatedAt, ann.ID)
+	query := `UPDATE annotations SET data = $1::jsonb, x = $2, y = $3, title = $4, text = $5, color = $6, updated_at = $7 WHERE id = $8`
+	res, err := r.db.ExecContext(ctx, query, data, x, y, title, text, color, ann.UpdatedAt, ann.ID)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to update annotation")
-		return err
+		return nil, err
 	}
 	rows, _ := res.RowsAffected()
 	if rows == 0 {
-		return domain.ErrAnnotationNotFound
+		return nil, domain.ErrAnnotationNotFound
 	}
-	return nil
+
+	merged := existing
+	merged.Data = data
+	merged.X = x
+	merged.Y = y
+	merged.Title = title
+	merged.Text = text
+	merged.Color = color
+	merged.UpdatedAt = ann.UpdatedAt
+	return &merged, nil
 }
 
 func (r *annotationRepository) Delete(ctx context.Context, id string) error {

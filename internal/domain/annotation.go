@@ -39,6 +39,7 @@ type UpdateAnnotationRequest struct {
 	Y           float64 `json:"y"`
 	Title       string  `json:"title"`
 	Text        string  `json:"text"`
+	Color       string  `json:"color"`
 }
 
 type AnnotationResponse struct {
